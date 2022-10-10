@@ -17,12 +17,15 @@ extension View {
 struct ContentView: View {
   @Environment(\.accessibilityDifferentiateWithoutColor) var differentiateWithoutColor
   @Environment(\.scenePhase) var scenePhase
+  @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
   @State private var cards = [Card](repeating: Card.example, count: 10)
   @State private var timeRemaining = 100
   @State private var isActive = true
   let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
   
   func removeCard(at index: Int) {
+    guard index >= 0 else { return }
+    
     cards.remove(at: index)
     
     if cards.isEmpty {
@@ -37,7 +40,7 @@ struct ContentView: View {
   
   var body: some View {
     ZStack {
-      Image("background")
+      Image(decorative: "background")
         .resizable()
         .ignoresSafeArea()
       VStack {
@@ -52,10 +55,13 @@ struct ContentView: View {
           ForEach(0..<cards.count, id: \.self) { index in
             CardView(card: cards[index]) {
               withAnimation {
+                print("\(cards.count - 1)")
                 removeCard(at: index)
               }
             }
               .stacked(at: index, in: cards.count)
+              .allowsTightening(index == cards.count - 1)
+              .accessibilityHidden(index < cards.count - 1)
           }
         }
         .allowsHitTesting(timeRemaining > 0)
@@ -68,20 +74,38 @@ struct ContentView: View {
             .clipShape(Capsule())
         }
       }
-      if differentiateWithoutColor {
+      if differentiateWithoutColor || voiceOverEnabled  {
         VStack {
           Spacer()
           
           HStack {
-            Image(systemName: "xmark.circle")
-              .padding()
-              .background(.black.opacity(0.7))
-              .clipShape(Circle())
+            Button {
+              withAnimation {
+                removeCard(at: cards.count - 1)
+              }
+            } label: {
+              Image(systemName: "xmark.circle")
+                .padding()
+                .background(.black.opacity(0.7))
+                .clipShape(Circle())
+            }
+            .accessibilityLabel("Wrong")
+            .accessibilityHint("Mark your answer as being incorrect.")
+            
             Spacer()
-            Image(systemName: "checkmark.circle")
-              .padding()
-              .background(.black.opacity(0.7))
-              .clipShape(Circle())
+            
+            Button {
+              withAnimation {
+                removeCard(at: cards.count - 1)
+              }
+            } label: {
+              Image(systemName: "checkmark.circle")
+                .padding()
+                .background(.black.opacity(0.7))
+                .clipShape(Circle())
+            }
+            .accessibilityLabel("Correct")
+            .accessibilityHint("Mark your answer as being correct.")
           }
           .foregroundColor(.white)
           .font(.largeTitle)
