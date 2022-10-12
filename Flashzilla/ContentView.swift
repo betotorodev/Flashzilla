@@ -18,23 +18,20 @@ struct ContentView: View {
   @Environment(\.accessibilityDifferentiateWithoutColor) var differentiateWithoutColor
   @Environment(\.scenePhase) var scenePhase
   @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
-  @State private var cards = [Card]()
+  @State private var cards = DataManager.load()
   @State private var timeRemaining = 100
   @State private var isActive = true
   @State private var showingEditScreen = false
   let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
   
-  func loadData() {
-    if let data = UserDefaults.standard.data(forKey: "Cards") {
-      if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
-        cards = decoded
-      }
-    }
-  }
-  func removeCard(at index: Int) {
+  func removeCard(at index: Int, reinsert: Bool) {
     guard index >= 0 else { return }
     
-    cards.remove(at: index)
+    if reinsert {
+      cards.move(fromOffsets: IndexSet(integer: index), toOffset: 0)
+    } else {
+      cards.remove(at: index)
+    }
     
     if cards.isEmpty {
       isActive = false
@@ -44,7 +41,7 @@ struct ContentView: View {
     timeRemaining = 100
     isActive = true
     
-    loadData()
+    cards = DataManager.load()
   }
   
   var body: some View {
@@ -61,15 +58,15 @@ struct ContentView: View {
           .background(.black.opacity(0.75))
           .clipShape(Capsule())
         ZStack {
-          ForEach(0..<cards.count, id: \.self) { index in
-            CardView(card: cards[index]) {
+          ForEach(Array(cards.enumerated()), id: \.element) { item in
+            CardView(card: item.element) { reinsert in
               withAnimation {
-                removeCard(at: index)
+                removeCard(at: item.offset, reinsert: reinsert)
               }
             }
-              .stacked(at: index, in: cards.count)
-              .allowsTightening(index == cards.count - 1)
-              .accessibilityHidden(index < cards.count - 1)
+              .stacked(at: item.offset, in: cards.count)
+              .allowsTightening(item.offset == cards.count - 1)
+              .accessibilityHidden(item.offset < cards.count - 1)
           }
         }
         .allowsHitTesting(timeRemaining > 0)
@@ -110,7 +107,7 @@ struct ContentView: View {
           HStack {
             Button {
               withAnimation {
-                removeCard(at: cards.count - 1)
+                removeCard(at: cards.count - 1, reinsert: true)
               }
             } label: {
               Image(systemName: "xmark.circle")
@@ -125,7 +122,7 @@ struct ContentView: View {
             
             Button {
               withAnimation {
-                removeCard(at: cards.count - 1)
+                removeCard(at: cards.count - 1, reinsert: false)
               }
             } label: {
               Image(systemName: "checkmark.circle")
